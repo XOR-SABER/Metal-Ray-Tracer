@@ -1,5 +1,5 @@
 //
-//  Shaders.metal
+//  Quad.metal
 //  Metal-Ray-Tracer
 //
 //  Created by Alexander Betancourt on 3/18/25.
@@ -15,16 +15,19 @@ struct Vertex {
 
 struct FragmentInput {
     float4 position [[position]];
-    float4 color;
+    float2 uv;
 };
 
 vertex FragmentInput vertex_main(Vertex v [[stage_in]]) {
     return {
         .position {v.position},
-        .color {v.color}
+        .uv {(v.position.xy + 1.0) / 2.0}
     };
 }
 
-fragment float4 fragment_main(FragmentInput input [[stage_in]]) {
-    return input.color;
+// Fragment Shader (Use Compute Shader Texture)
+fragment float4 fragment_main(FragmentInput in [[stage_in]], texture2d<float> tex [[texture(0)]]) {
+    constexpr sampler texSampler(mip_filter::linear, mag_filter::linear, min_filter::linear);
+    return tex.sample(texSampler, in.uv);
 }
+
