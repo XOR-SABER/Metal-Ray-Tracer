@@ -7,16 +7,26 @@
 import MetalKit
 
 class MetalRenderer:  NSObject, MTKViewDelegate {
-    
-    let vertexBuffer: MTLBuffer
-    let indexBuffer: MTLBuffer
-    let sphereBuffer: MTLBuffer
-    let sphereCountBuffer: MTLBuffer
-    let pipelineState: MTLRenderPipelineState
-    let computePipelineState: MTLComputePipelineState
-    let commandQueue: MTLCommandQueue
+    // Device
     let device: MTLDevice
+    // Buffers
+    let indexBuffer: MTLBuffer
+    let vertexBuffer: MTLBuffer
+    let sphereBuffer: MTLBuffer
+    let viewMatrixBuffer: MTLBuffer
+    let sphereCountBuffer: MTLBuffer
+    // Command Queue
+    let commandQueue: MTLCommandQueue
+    // Pipeline state
+    let pipelineState: MTLRenderPipelineState
+    // Compute pipeline state
+    let computePipelineState: MTLComputePipelineState
+    
+    // Texture variable
     var texture: MTLTexture
+    
+    // Camera
+    var camera = Camera()
     
     let vertices: [Vertex] = [
         Vertex(position2D: [  1.0,  1.0], color: [1, 0, 0]), // Top Right
@@ -30,14 +40,12 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         2, 3, 0  // Second Triangle
     ]
     
-    let spheres: [Sphere] = MetalRenderer.generateRandomSpheres(count: 256)
-
-
-
+    let spheres: [Sphere] = Sphere.generateRandomSpheres(count: 256)
     
     override init() {
         device = MetalRenderer.createMetalDevice()
         commandQueue = MetalRenderer.createCommandQueue(device: device)
+        viewMatrixBuffer = MetalRenderer.create4x4MatrixBuffer(with: device)
         vertexBuffer = MetalRenderer.createVertexBuffer(device: device, containing: vertices)
         indexBuffer = MetalRenderer.createIndexBuffer(device: device, containing: indices)
         sphereBuffer = MetalRenderer.createSphereBuffer(with: device, containing: spheres)
@@ -58,57 +66,9 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         let computeFunction = library.makeFunction(name: "compute_shader")!
         computePipelineState = MetalRenderer.createComputePipelineState(with: device, function: computeFunction)
         
+        GyroManager.instance.startGyroUpdates(for: camera)
         super.init();
     }
-    
-    
-    private static func generateRandomSpheres(count: Int, minRadius: Float = 0.8, maxRadius: Float = 2.5,
-                               minZ: Float = 10.0, maxZ: Float = 50.0, spacing: Float = 6.0) -> [Sphere] {
-        var spheres: [Sphere] = []
-        
-        // Estimate a grid size based on the count
-        let gridSize = Int(ceil(sqrt(Float(count)))) // Create a roughly square grid
-        let startX = -Float(gridSize) * spacing / 2
-        let startY = -Float(gridSize) * spacing / 2
-        
-        var index = 0
-        for row in 0..<gridSize {
-            for col in 0..<gridSize {
-                if index >= count { break }  // Stop when we reach the desired count
-
-                // Generate sphere positions in a structured grid with randomness
-                let randomOffsetX = Float.random(in: -spacing/2 ... spacing/2)
-                let randomOffsetY = Float.random(in: -spacing/2 ... spacing/2)
-                let randomOffsetZ = Float.random(in: -2.0 ... 2.0) // Minor depth variation
-
-                let x = startX + Float(col) * spacing + randomOffsetX
-                let y = startY + Float(row) * spacing + randomOffsetY
-                let z = Float.random(in: minZ...maxZ) + randomOffsetZ // Keep spheres at various depths
-
-                let randomRadius = Float.random(in: minRadius...maxRadius)
-
-                let randomColor = SIMD4<Float>(
-                    Float.random(in: 0.2...1.0),  // Red
-                    Float.random(in: 0.2...1.0),  // Green
-                    Float.random(in: 0.2...1.0),  // Blue
-                    1.0                           // Alpha (fully opaque)
-                )
-
-                let sphere = Sphere(
-                    center: SIMD4<Float>(x, y, z, 1.0),
-                    color: randomColor,
-                    radius: randomRadius
-                )
-
-                spheres.append(sphere)
-                index += 1
-            }
-        }
-
-        return spheres
-    }
-
-
     
     func draw(in view: MTKView) {
         guard let drawable = view.currentDrawable,
@@ -121,11 +81,18 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
             fatalError("Failed to create compute command encoder")
         }
         
+        var viewMatrix = camera.getViewMatrix()
+        memcpy(viewMatrixBuffer.contents(), &viewMatrix, MemoryLayout<simd_float4x4>.size)
+        
+        
+        // Send params to Compute shader
         computeEncoder.setComputePipelineState(computePipelineState)
         computeEncoder.setTexture(texture, index: 0)
         computeEncoder.setBuffer(sphereBuffer, offset: 0, index: 0)
         computeEncoder.setBuffer(sphereCountBuffer, offset: 0, index: 1)
-        // Let 16 * 16 threads run this
+        computeEncoder.setBuffer(viewMatrixBuffer, offset: 0, index: 2)
+        
+        // Let 32 * 32 threads run this
         let threadGroupSize = MTLSize(width: 32, height: 32, depth: 1)
         let threadGroups = MTLSize(width: texture.width / threadGroupSize.width,
                                    height: texture.height / threadGroupSize.height,
@@ -221,8 +188,6 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         }
         return sphereBuffer
     }
-
-
     
     private static func createSphereCountBuffer(with device: MTLDevice, containing sphereCount: Int) -> MTLBuffer {
         var count = sphereCount
@@ -231,6 +196,13 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
             fatalError("Failed to create sphere count buffer")
         }
         return sphereCountBuffer
+    }
+    
+    private static func create4x4MatrixBuffer(with device: MTLDevice) -> MTLBuffer {
+        guard let buffer = device.makeBuffer(length: MemoryLayout<simd_float4x4>.stride, options: .storageModeShared) else {
+            fatalError("Failed to create matrix buffer")
+        }
+        return buffer
     }
     
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}

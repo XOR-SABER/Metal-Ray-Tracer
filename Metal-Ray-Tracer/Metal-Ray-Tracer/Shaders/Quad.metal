@@ -25,7 +25,6 @@ vertex FragmentInput vertex_main(Vertex v [[stage_in]]) {
     };
 }
 
-// Fragment Shader (Use Compute Shader Texture)
 fragment float4 fragment_main(FragmentInput in [[stage_in]], texture2d<float> tex [[texture(0)]]) {
     constexpr sampler texSampler(mip_filter::linear, mag_filter::linear, min_filter::linear);
     return tex.sample(texSampler, in.uv);
