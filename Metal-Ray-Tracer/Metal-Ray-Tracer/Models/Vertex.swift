@@ -10,6 +10,7 @@ struct Vertex {
     let position2D: SIMD2<Float>
     let color: SIMD3<Float>
     
+    // Creates the buffer descriptor
     static func buildDefaultVertexDescriptor() -> MTLVertexDescriptor {
         let vertexDescriptor = MTLVertexDescriptor()
         

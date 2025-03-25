@@ -11,13 +11,15 @@ struct Sphere {
     var color: SIMD4<Float>   // RGBA color
     var radius: Float
 
+    // Builds the buffer layour for sphere
     static func buildBufferLayout() -> MTLBufferLayoutDescriptor {
         let layoutDescriptor = MTLBufferLayoutDescriptor()
 
         layoutDescriptor.stride = MemoryLayout<Sphere>.stride
         return layoutDescriptor
     }
-
+    
+    // Bulids the buffer description for Sphere
     static func buildBufferDescriptor() -> MTLVertexDescriptor {
         let descriptor = MTLVertexDescriptor()
 
@@ -38,6 +40,7 @@ struct Sphere {
         return descriptor
     }
     
+    // This one is just shitty.
     static func generateRandomSpheres(count: Int, minRadius: Float = 0.8, maxRadius: Float = 2.5,
                                minZ: Float = 10.0, maxZ: Float = 50.0, spacing: Float = 6.0) -> [Sphere] {
         var spheres: [Sphere] = []

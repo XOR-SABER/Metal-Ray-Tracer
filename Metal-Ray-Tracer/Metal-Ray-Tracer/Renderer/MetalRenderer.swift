@@ -116,6 +116,7 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         commandBuffer.commit()
     }
     
+    // Creates the device to render on
     private static func createMetalDevice() -> MTLDevice {
         guard let device = MTLCreateSystemDefaultDevice() else {
             fatalError("Metal device not available")
@@ -123,6 +124,7 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         return device
     }
     
+    // Create Command queue
     private static func createCommandQueue(device: MTLDevice) -> MTLCommandQueue {
         guard let commandQueue = device.makeCommandQueue() else {
             fatalError("Command queue not available")
@@ -130,6 +132,7 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         return commandQueue
     }
     
+    // Creates buffer for vertexes
     private static func createVertexBuffer(device: MTLDevice, containing vertices: [Vertex]) -> MTLBuffer {
         guard let vertexBuffer = device.makeBuffer(bytes: vertices, length: MemoryLayout<Vertex>.stride * vertices.count, options: []) else {
             fatalError("Unable to create vertex buffer")
@@ -137,6 +140,7 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         return vertexBuffer
     }
     
+    // Complies .metal files
     private static func createDefaultMetalLibary(device: MTLDevice) -> MTLLibrary {
         guard let defaultLibrary = device.makeDefaultLibrary() else {
             fatalError( "No .metal files in the Xcode project")
@@ -152,6 +156,8 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
             fatalError("Failed to create the pipeline state: \(error.localizedDescription)")
         }
     }
+    
+    //Creates texture
     private static func createTexture(device: MTLDevice, width: Int, height: Int) -> MTLTexture {
         let descriptor = MTLTextureDescriptor()
         descriptor.pixelFormat = .bgra8Unorm
@@ -166,6 +172,7 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         return texture
     }
     
+    //Creates buffer for vertex indiexes
     private static func createIndexBuffer(device: MTLDevice, containing indices: [UInt16]) -> MTLBuffer {
         guard let indexBuffer = device.makeBuffer(bytes: indices, length: MemoryLayout<UInt16>.stride * indices.count, options: []) else {
             fatalError("Failed to create index buffer")
@@ -173,6 +180,7 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         return indexBuffer
     }
     
+    // Creates the pipeline state
     private static func createComputePipelineState(with device: MTLDevice, function: MTLFunction) -> MTLComputePipelineState {
         do {
             return try device.makeComputePipelineState(function: function)
@@ -181,6 +189,7 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         }
     }
     
+    // Send Sphere buffer to gpu
     private static func createSphereBuffer(with device: MTLDevice, containing spheres: [Sphere]) -> MTLBuffer {
         let stride = MemoryLayout<Sphere>.stride * spheres.count
         guard let sphereBuffer = device.makeBuffer(bytes: spheres, length: stride, options: []) else {
@@ -189,6 +198,7 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         return sphereBuffer
     }
     
+    // Send Sphere count buffer to gpu
     private static func createSphereCountBuffer(with device: MTLDevice, containing sphereCount: Int) -> MTLBuffer {
         var count = sphereCount
         let stride = MemoryLayout<Int>.stride
@@ -198,6 +208,7 @@ class MetalRenderer:  NSObject, MTKViewDelegate {
         return sphereCountBuffer
     }
     
+    // Send matrix buffer to gpu
     private static func create4x4MatrixBuffer(with device: MTLDevice) -> MTLBuffer {
         guard let buffer = device.makeBuffer(length: MemoryLayout<simd_float4x4>.stride, options: .storageModeShared) else {
             fatalError("Failed to create matrix buffer")

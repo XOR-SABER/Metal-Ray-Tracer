@@ -26,12 +26,12 @@ float4 computeBackgroundColor(float4 raydir) {
     return mix(float4(1.0, 1.0, 1.0, 1.0), float4(0.5, 0.7, 1.0, 1.0), t);
 }
 
+// Ray sphere intersection
 Result raySphereIntersection(Ray ray, Sphere sph) {
     constexpr float INF = 1e10;
     Result res;
     res.hit = false;
     res.t = INF;
-    res.color = computeBackgroundColor(ray.direction);
     
     float4 oc = ray.origin - sph.center;
     float a = dot(ray.direction.xyz, ray.direction.xyz);
@@ -51,34 +51,25 @@ Result raySphereIntersection(Ray ray, Sphere sph) {
         res.hitPoint = ray.origin + t * ray.direction;
         res.t = t;
         res.color = sph.color;
-        res.normal = normalize(res.hitPoint - sph.center);
+        res.normal = float4(normalize(res.hitPoint.xyz - sph.center.xyz), 1.0f);
     }
     
     return res;
 }
 
-float computeShadowFactor(Result result, float4 lightDirection, constant Sphere *spheres, int sphereCount) {
-    constexpr float SHADOW_BIAS = 0.1f;
+bool isInShadow(float4 hitPoint, float4 lightDir, constant Sphere *spheres, int sphereCount) {
     Ray shadowRay;
-    shadowRay.origin = result.hitPoint + result.normal * SHADOW_BIAS;
-    shadowRay.direction = -lightDirection;
-
+    shadowRay.origin = hitPoint + lightDir * 0.001;
+    shadowRay.direction = lightDir;
+    
     for (int i = 0; i < sphereCount; i++) {
-        Result shadowRes = raySphereIntersection(shadowRay, spheres[i]);
-        if (shadowRes.hit) return 0.4;
+        Result shadowHit = raySphereIntersection(shadowRay, spheres[i]);
+        if (shadowHit.hit && shadowHit.t > 0.0) {
+            return true;
+        }
     }
-
-    return 1.0;
+    return false; // point is lit
 }
-
-
-float4 computeLighting(Result closestHit, float4 lightDirection, float shadowFactor) {
-    float ambient = 0.65;
-    float diffuse = max(dot(closestHit.normal, -lightDirection), 0.1);
-    float lighting = ambient + shadowFactor * diffuse;
-    return closestHit.color * lighting;
-}
-
 
 
 kernel void compute_shader(texture2d<float, access::write> output [[texture(0)]],
@@ -86,7 +77,8 @@ kernel void compute_shader(texture2d<float, access::write> output [[texture(0)]]
                            constant int &sphereCount [[buffer(1)]],
                            constant float4x4 &viewMatrix [[buffer(2)]],
                            uint2 gid [[thread_position_in_grid]]) {
-    float4 lightDirection = normalize(float4(0.3, -0.7, 0.3, 0.0));
+    
+    float4 lightDirection = normalize(float4(0.0, 1.0, -1.0, 1.0));
     constexpr float INF = 1e10;
     
     uint width = output.get_width();
@@ -110,15 +102,18 @@ kernel void compute_shader(texture2d<float, access::write> output [[texture(0)]]
             closestHit = res;
         }
     }
-    
     if (closestHit.hit) {
-            float shadowFactor = computeShadowFactor(closestHit, lightDirection, spheres, sphereCount);
-        closestHit.color = computeLighting(closestHit, lightDirection, shadowFactor);
-
+        float diffuse = max(dot(closestHit.normal, lightDirection), 0.0);
+        bool shadow = isInShadow(closestHit.hitPoint, lightDirection, spheres, sphereCount);
+        
+        if (shadow) {
+            diffuse *= 0.6f;
+        }
+        
+        closestHit.color.xyz *= diffuse;
     } else {
         closestHit.color = computeBackgroundColor(ray.direction);
     }
-    closestHit.color = clamp(closestHit.color, 0.0f, 1.0f);
-    closestHit.color.w = 1.0f;
+    
     output.write(closestHit.color, gid);
 }

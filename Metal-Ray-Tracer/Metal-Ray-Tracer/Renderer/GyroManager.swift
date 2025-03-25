@@ -7,6 +7,7 @@
 
 import CoreMotion
 
+// Managing the gyro controlls.
 public class GyroManager {
     public static let instance = GyroManager()
     private let motionManager = CMMotionManager()
@@ -15,6 +16,7 @@ public class GyroManager {
     private init() {}
     
     func startGyroUpdates(for camera: Camera) {
+        // Take the camera
         self.camera = camera
         
         guard motionManager.isGyroAvailable else {
